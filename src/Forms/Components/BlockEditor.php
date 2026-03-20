@@ -23,6 +23,8 @@ class BlockEditor extends Field
 
     /**
      * Convert stored JSON block structure to an HTML string for frontend display.
+     *
+     * Supports the v2 format: { root: {spacing}, containers: [...] }
      */
     public static function renderHtml(?string $json): string
     {
@@ -30,81 +32,92 @@ class BlockEditor extends Field
             return '';
         }
 
-        $blocks = json_decode($json, true);
+        $data = json_decode($json, true);
 
-        if (! is_array($blocks)) {
+        if (! is_array($data)) {
             return '';
         }
 
-        return implode("\n", array_map([static::class, 'renderBlock'], $blocks));
+        // v2 format
+        if (isset($data['containers'])) {
+            return static::renderV2($data);
+        }
+
+        return '';
     }
 
-    private static function renderBlock(array $block): string
+    // ── v2 renderer ───────────────────────────────────────────────────────────
+
+    private static function spacingStyle(array $d): string
+    {
+        $px = fn ($v) => ((int) ($v ?? 0)) . 'px';
+        return 'margin:' . $px($d['mt'] ?? 0) . ' ' . $px($d['mr'] ?? 0) . ' '
+                         . $px($d['mb'] ?? 0) . ' ' . $px($d['ml'] ?? 0) . ';'
+             . 'padding:' . $px($d['pt'] ?? 0) . ' ' . $px($d['pr'] ?? 0) . ' '
+                          . $px($d['pb'] ?? 0) . ' ' . $px($d['pl'] ?? 0) . ';';
+    }
+
+    private static function renderV2(array $data): string
+    {
+        $root       = $data['root'] ?? [];
+        $containers = $data['containers'] ?? [];
+
+        $inner = implode("\n", array_map([static::class, 'renderContainer'], $containers));
+
+        return '<div style="' . static::spacingStyle($root) . '">' . $inner . '</div>';
+    }
+
+    private static function renderContainer(array $c): string
+    {
+        $colClass  = 'fbc-' . ($c['id'] ?? uniqid());
+        $colStyle  = 'flex:1;min-width:0;';
+        $wrapStyle = static::spacingStyle($c) . 'display:flex;flex-wrap:wrap;gap:1rem;';
+
+        $colsHtml = implode('', array_map(function ($col) use ($colClass, $colStyle) {
+            $blocksHtml = implode("\n", array_filter(
+                array_map([static::class, 'renderContentBlock'], $col['blocks'] ?? [])
+            ));
+            return '<div class="' . $colClass . '" style="' . $colStyle . '">' . $blocksHtml . '</div>';
+        }, $c['columns'] ?? []));
+
+        $cols       = max(1, min(4, (int) ($c['cols'] ?? 1)));
+        $responsive = $cols > 1
+            ? '<style>@media(max-width:640px){.' . $colClass . '{flex:0 0 100%!important;min-width:100%!important;}}</style>'
+            : '';
+
+        return '<div style="' . $wrapStyle . '">' . $colsHtml . '</div>' . $responsive;
+    }
+
+    private static function renderContentBlock(array $block): string
     {
         $data = $block['data'] ?? [];
-        $type = $block['type'] ?? '';
 
-        return match ($type) {
-            'paragraph' => '<p style="margin:0 0 1em;line-height:1.6;color:#374151;">' . e($data['text'] ?? '') . '</p>',
-
-            'heading' => (function () use ($data): string {
-                $level = max(1, min(6, (int) ($data['level'] ?? 2)));
-                $tag   = "h{$level}";
-                $sizes = [1 => '2rem', 2 => '1.5rem', 3 => '1.25rem', 4 => '1.1rem', 5 => '1rem', 6 => '0.9rem'];
-                $size  = $sizes[$level] ?? '1.5rem';
-
-                return "<{$tag} style=\"margin:0 0 0.5em;font-size:{$size};font-weight:700;color:#111827;\">"
-                    . e($data['text'] ?? '')
-                    . "</{$tag}>";
-            })(),
+        return match ($block['type'] ?? '') {
+            'paragraph' => ! empty($data['html'])
+                ? '<div style="line-height:1.6;color:#374151;margin-bottom:0.75em;">' . $data['html'] . '</div>'
+                : '',
 
             'image' => (function () use ($data): string {
                 if (empty($data['src'])) {
                     return '';
                 }
-                $align     = in_array($data['align'] ?? '', ['left', 'center', 'right']) ? $data['align'] : 'center';
+                $align      = in_array($data['align'] ?? '', ['left', 'center', 'right']) ? $data['align'] : 'center';
                 $marginAuto = match ($align) {
                     'center' => 'margin:0 auto;',
                     'right'  => 'margin-left:auto;',
                     default  => '',
                 };
-
                 return '<div style="text-align:' . $align . ';">'
                     . '<img src="' . e($data['src']) . '" alt="' . e($data['alt'] ?? '') . '" '
                     . 'style="max-width:100%;width:' . e($data['width'] ?? '100%') . ';display:block;border-radius:4px;' . $marginAuto . '">'
                     . '</div>';
             })(),
 
-            'columns' => '<div style="display:flex;gap:1rem;">'
-                . '<div style="flex:1;min-width:0;">' . ($data['left'] ?? '') . '</div>'
-                . '<div style="flex:1;min-width:0;">' . ($data['right'] ?? '') . '</div>'
-                . '</div>',
-
-            'button' => (function () use ($data): string {
-                $styles = [
-                    'primary'   => 'background:#4f46e5;color:#fff;',
-                    'secondary' => 'background:#6b7280;color:#fff;',
-                    'outline'   => 'background:transparent;color:#4f46e5;border:2px solid #4f46e5;',
-                    'danger'    => 'background:#dc2626;color:#fff;',
-                ];
-                $style = $styles[$data['variant'] ?? 'primary'] ?? $styles['primary'];
-
-                return '<div style="text-align:center;margin:1em 0;">'
-                    . '<a href="' . e($data['url'] ?? '#') . '" '
-                    . 'style="display:inline-block;padding:0.6em 1.5em;border-radius:6px;font-weight:600;text-decoration:none;' . $style . '">'
-                    . e($data['text'] ?? 'Button')
-                    . '</a></div>';
-            })(),
-
-            'divider' => (function () use ($data): string {
-                $spacing = ['sm' => '0.5rem', 'md' => '1rem', 'lg' => '2rem'][$data['spacing'] ?? 'md'] ?? '1rem';
-
-                return "<hr style=\"border:none;border-top:1px solid #e5e7eb;margin:{$spacing} 0;\">";
-            })(),
-
-            'spacer' => '<div style="height:' . max(4, (int) ($data['height'] ?? 32)) . 'px;"></div>',
-
-            'html' => $data['code'] ?? '',
+            'video' => ! empty($data['embed'])
+                ? '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:6px;margin-bottom:0.75em;">'
+                    . preg_replace('/<iframe/i', '<iframe style="position:absolute;top:0;left:0;width:100%;height:100%;"', $data['embed'])
+                    . '</div>'
+                : '',
 
             default => '',
         };
