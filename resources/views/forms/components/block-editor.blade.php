@@ -91,7 +91,12 @@
     @endonce
 
     @php
-        $statePath = $getStatePath();
+        $statePath        = $getStatePath();
+        $mediaCollection  = $getMediaCollection();
+        $record           = $getRecord();
+        $mediaItems       = ($mediaCollection && $record && method_exists($record, 'getMedia'))
+            ? $record->getMedia($mediaCollection)
+            : collect();
     @endphp
 
     <div x-data="blockEditor({ state: $wire.entangle('{{ $statePath }}').live })" x-cloak>
@@ -387,12 +392,39 @@
                     </div>
                 </div>
 
-                {{-- ── Right: mini HTML preview ─────────────────────── --}}
-                <div class="w-60 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto bg-white dark:bg-gray-900 p-3"
-                     x-show="blocks.length > 0">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Anteprima</p>
-                    <div class="text-xs bg-gray-50 dark:bg-gray-800/50 rounded border border-gray-200 dark:border-gray-700 p-2 fbe-preview"
-                         x-html="previewHtml()"></div>
+                {{-- ── Right sidebar: media + preview ───────────────── --}}
+                <div class="w-60 shrink-0 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
+
+                    @if($mediaItems->isNotEmpty())
+                    {{-- Media gallery --}}
+                    <div class="shrink-0 border-b border-gray-200 dark:border-gray-700 overflow-y-auto p-3" style="max-height:55%;">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">📷 Media — clicca per inserire</p>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            @foreach($mediaItems as $medium)
+                                @php $url = e($medium->getUrl()); $name = e($medium->name ?: $medium->file_name); @endphp
+                                <button
+                                    type="button"
+                                    title="{{ $name }}"
+                                    @click="addBlock('image'); $nextTick(() => { if(blocks.length){ let b = blocks[blocks.length-1]; if(b.type==='image'){ updateData(b.id,'src','{{ $url }}'); updateData(b.id,'alt','{{ $name }}'); } } })"
+                                    class="group relative rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+                                >
+                                    <img src="{{ $url }}" alt="{{ $name }}" class="w-full h-14 object-cover block">
+                                    <div class="absolute inset-0 bg-primary-600/0 group-hover:bg-primary-600/20 transition-colors flex items-center justify-center">
+                                        <span class="opacity-0 group-hover:opacity-100 text-white text-[10px] font-bold drop-shadow transition-opacity">+ inserisci</span>
+                                    </div>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    {{-- Mini HTML preview --}}
+                    <div class="flex-1 overflow-y-auto p-3" x-show="blocks.length > 0">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Anteprima</p>
+                        <div class="text-xs bg-gray-50 dark:bg-gray-800/50 rounded border border-gray-200 dark:border-gray-700 p-2 fbe-preview"
+                             x-html="previewHtml()"></div>
+                    </div>
+
                 </div>
 
             </div>{{-- /body --}}

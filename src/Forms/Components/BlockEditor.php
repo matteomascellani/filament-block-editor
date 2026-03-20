@@ -8,6 +8,19 @@ class BlockEditor extends Field
 {
     protected string $view = 'filament-block-editor::forms.components.block-editor';
 
+    protected ?string $mediaCollection = null;
+
+    public function mediaCollection(string $collection): static
+    {
+        $this->mediaCollection = $collection;
+        return $this;
+    }
+
+    public function getMediaCollection(): ?string
+    {
+        return $this->mediaCollection;
+    }
+
     /**
      * Convert stored JSON block structure to an HTML string for frontend display.
      */
