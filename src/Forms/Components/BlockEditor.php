@@ -101,15 +101,32 @@ class BlockEditor extends Field
                 if (empty($data['src'])) {
                     return '';
                 }
-                $align      = in_array($data['align'] ?? '', ['left', 'center', 'right']) ? $data['align'] : 'center';
-                $marginAuto = match ($align) {
-                    'center' => 'margin:0 auto;',
-                    'right'  => 'margin-left:auto;',
-                    default  => '',
-                };
-                return '<div style="text-align:' . $align . ';">'
+                $align    = in_array($data['align'] ?? '', ['left', 'center', 'right']) ? $data['align'] : 'left';
+                $width    = $data['width'] ?? '100%';
+                $isFullW  = ($width === '100%');
+
+                $wrapperStyle = implode(';', array_filter([
+                    'overflow:hidden',
+                    'border-radius:8px',
+                    'border:1px solid #e5e7eb',
+                    'margin-bottom:0.75em',
+                    // aspect-ratio ensures equal height when columns are side by side
+                    $isFullW ? 'aspect-ratio:16/9' : null,
+                    'width:' . $width,
+                    match ($align) {
+                        'center' => 'margin-left:auto;margin-right:auto',
+                        'right'  => 'margin-left:auto',
+                        default  => '',
+                    },
+                ]));
+
+                $imgStyle = $isFullW
+                    ? 'width:100%;height:100%;object-fit:cover;display:block;'
+                    : 'width:100%;max-width:100%;height:auto;display:block;';
+
+                return '<div style="' . $wrapperStyle . '">'
                     . '<img src="' . e($data['src']) . '" alt="' . e($data['alt'] ?? '') . '" '
-                    . 'style="max-width:100%;width:' . e($data['width'] ?? '100%') . ';display:block;border-radius:4px;' . $marginAuto . '">'
+                    . 'style="' . $imgStyle . '" loading="lazy">'
                     . '</div>';
             })(),
 
