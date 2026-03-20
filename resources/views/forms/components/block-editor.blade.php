@@ -87,6 +87,36 @@
         .dark .fbe-input:focus { border-color: rgb(99 102 241); }
         .fbe-textarea { resize: vertical; min-height: 72px; }
         .fbe-select { cursor: pointer; }
+
+        /* ── Drag & drop ─────────────────────────────────────────────────── */
+        .fbe-draggable {
+            cursor: grab;
+        }
+        .fbe-draggable:active { cursor: grabbing; }
+
+        /* Drop strip between blocks */
+        .fbe-drop-strip {
+            height: 8px;
+            border-radius: 4px;
+            transition: height 0.1s, background 0.1s;
+            margin: 0;
+        }
+        .fbe-drop-strip.fbe-drop-active,
+        .fbe-drop-strip:hover {
+            height: 28px;
+            background: rgba(99,102,241,0.15);
+            border: 2px dashed rgb(99 102 241);
+        }
+
+        /* Drop zone on image / column sides */
+        .fbe-drop-zone {
+            border-radius: 6px;
+            transition: box-shadow 0.1s, background 0.1s;
+        }
+        .fbe-drop-zone.fbe-drop-active {
+            box-shadow: 0 0 0 2px rgb(99 102 241);
+            background: rgba(99,102,241,0.07);
+        }
     </style>
     @endonce
 
@@ -218,214 +248,249 @@
                         <p class="text-xs mt-1 text-gray-400">Clicca un tipo a sinistra per iniziare</p>
                     </div>
 
-                    {{-- Blocks --}}
-                    <div class="max-w-2xl mx-auto space-y-3" x-show="blocks.length > 0">
+                    {{-- Blocks list with drop strips between them --}}
+                    <div class="max-w-2xl mx-auto" x-show="blocks.length > 0">
+
+                        {{-- Drop zone BEFORE first block --}}
+                        <div class="fbe-drop-strip"
+                             :class="{ 'fbe-drop-active': dragTarget === 'before-0' }"
+                             @dragover.prevent="setDragTarget('before-0')"
+                             @dragleave="clearDragTarget()"
+                             @drop.prevent="dropNewBlock(0)"></div>
+
                         <template x-for="(block, idx) in blocks" :key="block.id">
-                            <div
-                                class="fbe-block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
-                                :class="{ 'fbe-selected': false }"
-                            >
-                                {{-- Block header --}}
-                                <div class="flex items-center justify-between px-3 py-1 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400"
-                                          x-text="blockLabel(block.type)"></span>
-                                    <div class="flex items-center gap-0.5">
-                                        <button type="button" class="fbe-ctrl" title="Su"      :disabled="idx === 0"                   @click="moveUp(block.id)">↑</button>
-                                        <button type="button" class="fbe-ctrl" title="Giù"     :disabled="idx === blocks.length - 1"   @click="moveDown(block.id)">↓</button>
-                                        <button type="button" class="fbe-ctrl" title="Duplica"                                         @click="duplicate(block.id)">⎘</button>
-                                        <button type="button" class="fbe-ctrl fbe-ctrl-danger" title="Elimina"                         @click="removeBlock(block.id)">×</button>
+                            <div>
+                                <div
+                                    class="fbe-block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                                >
+                                    {{-- Block header --}}
+                                    <div class="flex items-center justify-between px-3 py-1 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400"
+                                              x-text="blockLabel(block.type)"></span>
+                                        <div class="flex items-center gap-0.5">
+                                            <button type="button" class="fbe-ctrl" title="Su"      :disabled="idx === 0"                   @click="moveUp(block.id)">↑</button>
+                                            <button type="button" class="fbe-ctrl" title="Giù"     :disabled="idx === blocks.length - 1"   @click="moveDown(block.id)">↓</button>
+                                            <button type="button" class="fbe-ctrl" title="Duplica"                                         @click="duplicate(block.id)">⎘</button>
+                                            <button type="button" class="fbe-ctrl fbe-ctrl-danger" title="Elimina"                         @click="removeBlock(block.id)">×</button>
+                                        </div>
+                                    </div>
+
+                                    {{-- Block edit form --}}
+                                    <div class="p-3">
+
+                                        {{-- PARAGRAPH --}}
+                                        <template x-if="block.type === 'paragraph'">
+                                            <textarea
+                                                class="fbe-input fbe-textarea"
+                                                placeholder="Testo paragrafo..."
+                                                :value="block.data.text"
+                                                @input="updateData(block.id, 'text', $event.target.value)"
+                                                rows="4"></textarea>
+                                        </template>
+
+                                        {{-- HEADING --}}
+                                        <template x-if="block.type === 'heading'">
+                                            <div class="space-y-2">
+                                                <input type="text"
+                                                    class="fbe-input font-bold text-base"
+                                                    placeholder="Testo del titolo..."
+                                                    :value="block.data.text"
+                                                    @input="updateData(block.id, 'text', $event.target.value)">
+                                                <select class="fbe-input fbe-select"
+                                                    :value="String(block.data.level)"
+                                                    @change="updateData(block.id, 'level', parseInt($event.target.value))">
+                                                    <option value="2">H2 — Titolo principale</option>
+                                                    <option value="3">H3 — Sottotitolo</option>
+                                                    <option value="4">H4 — Titolo piccolo</option>
+                                                </select>
+                                            </div>
+                                        </template>
+
+                                        {{-- IMAGE (drag-drop target) --}}
+                                        <template x-if="block.type === 'image'">
+                                            <div class="space-y-2">
+                                                {{-- Drop zone over the image preview --}}
+                                                <div class="fbe-drop-zone rounded border border-gray-200 dark:border-gray-700 overflow-hidden h-28 flex items-center justify-center bg-gray-50 dark:bg-gray-700/30 relative"
+                                                     :class="{ 'fbe-drop-active': dragTarget === 'img-' + block.id }"
+                                                     @dragover.prevent="setDragTarget('img-' + block.id)"
+                                                     @dragleave="clearDragTarget()"
+                                                     @drop.prevent="dropOnImageBlock(block.id)">
+                                                    <img x-show="block.data.src" :src="block.data.src" :alt="block.data.alt || ''"
+                                                         class="max-h-28 max-w-full object-contain">
+                                                    <span x-show="!block.data.src" class="text-xs text-gray-400 select-none">
+                                                        🖼 Trascina un'immagine qui
+                                                    </span>
+                                                    <div x-show="dragTarget === 'img-' + block.id"
+                                                         class="absolute inset-0 flex items-center justify-center bg-primary-50/80 dark:bg-primary-900/50 pointer-events-none">
+                                                        <span class="text-xs font-bold text-primary-600 dark:text-primary-300">↓ Rilascia per sostituire</span>
+                                                    </div>
+                                                </div>
+                                                <input type="url" class="fbe-input"
+                                                    placeholder="URL immagine (https://...)"
+                                                    :value="block.data.src"
+                                                    @input="updateData(block.id, 'src', $event.target.value)">
+                                                <input type="text" class="fbe-input"
+                                                    placeholder="Testo alternativo (alt)"
+                                                    :value="block.data.alt"
+                                                    @input="updateData(block.id, 'alt', $event.target.value)">
+                                                <div class="flex gap-2">
+                                                    <select class="fbe-input fbe-select flex-1"
+                                                        :value="block.data.align"
+                                                        @change="updateData(block.id, 'align', $event.target.value)">
+                                                        <option value="left">⬛⬜ Sinistra</option>
+                                                        <option value="center">⬛ Centro</option>
+                                                        <option value="right">⬜⬛ Destra</option>
+                                                    </select>
+                                                    <input type="text" class="fbe-input w-28"
+                                                        placeholder="Larghezza (100%)"
+                                                        :value="block.data.width"
+                                                        @input="updateData(block.id, 'width', $event.target.value)">
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        {{-- 2 COLUMNS (each column is a drop zone) --}}
+                                        <template x-if="block.type === 'columns'">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                {{-- Left column --}}
+                                                <div class="fbe-drop-zone rounded"
+                                                     :class="{ 'fbe-drop-active': dragTarget === 'col-left-' + block.id }"
+                                                     @dragover.prevent="setDragTarget('col-left-' + block.id)"
+                                                     @dragleave="clearDragTarget()"
+                                                     @drop.prevent="dropOnColumn(block.id, 'left')">
+                                                    <p class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+                                                        Colonna sinistra
+                                                        <span x-show="dragTarget === 'col-left-' + block.id" class="text-primary-500 font-bold">↓ rilascia</span>
+                                                    </p>
+                                                    <textarea class="fbe-input fbe-textarea" rows="6"
+                                                        placeholder="Contenuto sinistra... (o trascina immagine)"
+                                                        :value="block.data.left"
+                                                        @input="updateData(block.id, 'left', $event.target.value)"></textarea>
+                                                </div>
+                                                {{-- Right column --}}
+                                                <div class="fbe-drop-zone rounded"
+                                                     :class="{ 'fbe-drop-active': dragTarget === 'col-right-' + block.id }"
+                                                     @dragover.prevent="setDragTarget('col-right-' + block.id)"
+                                                     @dragleave="clearDragTarget()"
+                                                     @drop.prevent="dropOnColumn(block.id, 'right')">
+                                                    <p class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+                                                        Colonna destra
+                                                        <span x-show="dragTarget === 'col-right-' + block.id" class="text-primary-500 font-bold">↓ rilascia</span>
+                                                    </p>
+                                                    <textarea class="fbe-input fbe-textarea" rows="6"
+                                                        placeholder="Contenuto destra... (o trascina immagine)"
+                                                        :value="block.data.right"
+                                                        @input="updateData(block.id, 'right', $event.target.value)"></textarea>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        {{-- BUTTON --}}
+                                        <template x-if="block.type === 'button'">
+                                            <div class="space-y-2">
+                                                <input type="text" class="fbe-input"
+                                                    placeholder="Testo del pulsante"
+                                                    :value="block.data.text"
+                                                    @input="updateData(block.id, 'text', $event.target.value)">
+                                                <input type="url" class="fbe-input"
+                                                    placeholder="URL destinazione (https://...)"
+                                                    :value="block.data.url"
+                                                    @input="updateData(block.id, 'url', $event.target.value)">
+                                                <select class="fbe-input fbe-select"
+                                                    :value="block.data.variant"
+                                                    @change="updateData(block.id, 'variant', $event.target.value)">
+                                                    <option value="primary">Primary (viola)</option>
+                                                    <option value="secondary">Secondary (grigio)</option>
+                                                    <option value="outline">Outline</option>
+                                                    <option value="danger">Danger (rosso)</option>
+                                                </select>
+                                                <div class="text-center pt-1" x-html="blockHtml(block)"></div>
+                                            </div>
+                                        </template>
+
+                                        {{-- DIVIDER --}}
+                                        <template x-if="block.type === 'divider'">
+                                            <div class="flex items-center gap-3">
+                                                <hr class="flex-1 border-gray-300 dark:border-gray-600">
+                                                <select class="fbe-input fbe-select w-40"
+                                                    :value="block.data.spacing"
+                                                    @change="updateData(block.id, 'spacing', $event.target.value)">
+                                                    <option value="sm">Spazio piccolo</option>
+                                                    <option value="md">Spazio medio</option>
+                                                    <option value="lg">Spazio grande</option>
+                                                </select>
+                                                <hr class="flex-1 border-gray-300 dark:border-gray-600">
+                                            </div>
+                                        </template>
+
+                                        {{-- SPACER --}}
+                                        <template x-if="block.type === 'spacer'">
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 rounded border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center"
+                                                     :style="'height:' + Math.min(80, parseInt(block.data.height) || 32) + 'px'">
+                                                    <span class="text-[10px] text-gray-400" x-text="(parseInt(block.data.height) || 32) + 'px spazio'"></span>
+                                                </div>
+                                                <input type="number" class="fbe-input w-24"
+                                                    min="4" max="300" step="4"
+                                                    :value="block.data.height"
+                                                    @input="updateData(block.id, 'height', parseInt($event.target.value) || 32)">
+                                            </div>
+                                        </template>
+
+                                        {{-- RAW HTML --}}
+                                        <template x-if="block.type === 'html'">
+                                            <div class="space-y-2">
+                                                <textarea class="fbe-input fbe-textarea font-mono text-xs" rows="8"
+                                                    placeholder="HTML personalizzato..."
+                                                    :value="block.data.code"
+                                                    @input="updateData(block.id, 'code', $event.target.value)"></textarea>
+                                                <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2 fbe-preview text-xs"
+                                                     x-html="block.data.code || ''"></div>
+                                            </div>
+                                        </template>
+
                                     </div>
                                 </div>
 
-                                {{-- Block edit form --}}
-                                <div class="p-3">
-
-                                    {{-- PARAGRAPH --}}
-                                    <template x-if="block.type === 'paragraph'">
-                                        <textarea
-                                            class="fbe-input fbe-textarea"
-                                            placeholder="Testo paragrafo..."
-                                            :value="block.data.text"
-                                            @input="updateData(block.id, 'text', $event.target.value)"
-                                            rows="4"></textarea>
-                                    </template>
-
-                                    {{-- HEADING --}}
-                                    <template x-if="block.type === 'heading'">
-                                        <div class="space-y-2">
-                                            <input type="text"
-                                                class="fbe-input font-bold text-base"
-                                                placeholder="Testo del titolo..."
-                                                :value="block.data.text"
-                                                @input="updateData(block.id, 'text', $event.target.value)">
-                                            <select class="fbe-input fbe-select"
-                                                :value="String(block.data.level)"
-                                                @change="updateData(block.id, 'level', parseInt($event.target.value))">
-                                                <option value="2">H2 — Titolo principale</option>
-                                                <option value="3">H3 — Sottotitolo</option>
-                                                <option value="4">H4 — Titolo piccolo</option>
-                                            </select>
-                                        </div>
-                                    </template>
-
-                                    {{-- IMAGE --}}
-                                    <template x-if="block.type === 'image'">
-                                        <div class="space-y-2">
-                                            <div x-show="block.data.src"
-                                                 class="rounded border border-gray-200 dark:border-gray-700 overflow-hidden h-28 flex items-center justify-center bg-gray-50 dark:bg-gray-700/30">
-                                                <img :src="block.data.src" :alt="block.data.alt || ''"
-                                                     class="max-h-28 max-w-full object-contain">
-                                            </div>
-                                            <input type="url" class="fbe-input"
-                                                placeholder="URL immagine (https://...)"
-                                                :value="block.data.src"
-                                                @input="updateData(block.id, 'src', $event.target.value)">
-                                            <input type="text" class="fbe-input"
-                                                placeholder="Testo alternativo (alt)"
-                                                :value="block.data.alt"
-                                                @input="updateData(block.id, 'alt', $event.target.value)">
-                                            <div class="flex gap-2">
-                                                <select class="fbe-input fbe-select flex-1"
-                                                    :value="block.data.align"
-                                                    @change="updateData(block.id, 'align', $event.target.value)">
-                                                    <option value="left">⬛⬜ Sinistra</option>
-                                                    <option value="center">⬛ Centro</option>
-                                                    <option value="right">⬜⬛ Destra</option>
-                                                </select>
-                                                <input type="text" class="fbe-input w-28"
-                                                    placeholder="Larghezza (100%)"
-                                                    :value="block.data.width"
-                                                    @input="updateData(block.id, 'width', $event.target.value)">
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    {{-- 2 COLUMNS --}}
-                                    <template x-if="block.type === 'columns'">
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <p class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Colonna sinistra</p>
-                                                <textarea class="fbe-input fbe-textarea" rows="6"
-                                                    placeholder="Contenuto sinistra..."
-                                                    :value="block.data.left"
-                                                    @input="updateData(block.id, 'left', $event.target.value)"></textarea>
-                                            </div>
-                                            <div>
-                                                <p class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Colonna destra</p>
-                                                <textarea class="fbe-input fbe-textarea" rows="6"
-                                                    placeholder="Contenuto destra..."
-                                                    :value="block.data.right"
-                                                    @input="updateData(block.id, 'right', $event.target.value)"></textarea>
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    {{-- BUTTON --}}
-                                    <template x-if="block.type === 'button'">
-                                        <div class="space-y-2">
-                                            <input type="text" class="fbe-input"
-                                                placeholder="Testo del pulsante"
-                                                :value="block.data.text"
-                                                @input="updateData(block.id, 'text', $event.target.value)">
-                                            <input type="url" class="fbe-input"
-                                                placeholder="URL destinazione (https://...)"
-                                                :value="block.data.url"
-                                                @input="updateData(block.id, 'url', $event.target.value)">
-                                            <select class="fbe-input fbe-select"
-                                                :value="block.data.variant"
-                                                @change="updateData(block.id, 'variant', $event.target.value)">
-                                                <option value="primary">Primary (viola)</option>
-                                                <option value="secondary">Secondary (grigio)</option>
-                                                <option value="outline">Outline</option>
-                                                <option value="danger">Danger (rosso)</option>
-                                            </select>
-                                            {{-- Preview --}}
-                                            <div class="text-center pt-1"
-                                                 x-html="blockHtml(block)"></div>
-                                        </div>
-                                    </template>
-
-                                    {{-- DIVIDER --}}
-                                    <template x-if="block.type === 'divider'">
-                                        <div class="flex items-center gap-3">
-                                            <hr class="flex-1 border-gray-300 dark:border-gray-600">
-                                            <select class="fbe-input fbe-select w-40"
-                                                :value="block.data.spacing"
-                                                @change="updateData(block.id, 'spacing', $event.target.value)">
-                                                <option value="sm">Spazio piccolo</option>
-                                                <option value="md">Spazio medio</option>
-                                                <option value="lg">Spazio grande</option>
-                                            </select>
-                                            <hr class="flex-1 border-gray-300 dark:border-gray-600">
-                                        </div>
-                                    </template>
-
-                                    {{-- SPACER --}}
-                                    <template x-if="block.type === 'spacer'">
-                                        <div class="flex items-center gap-2">
-                                            <div class="flex-1 rounded border-2 border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center"
-                                                 :style="'height:' + Math.min(80, parseInt(block.data.height) || 32) + 'px'">
-                                                <span class="text-[10px] text-gray-400" x-text="(parseInt(block.data.height) || 32) + 'px spazio'"></span>
-                                            </div>
-                                            <input type="number" class="fbe-input w-24"
-                                                min="4" max="300" step="4"
-                                                :value="block.data.height"
-                                                @input="updateData(block.id, 'height', parseInt($event.target.value) || 32)">
-                                        </div>
-                                    </template>
-
-                                    {{-- RAW HTML --}}
-                                    <template x-if="block.type === 'html'">
-                                        <div class="space-y-2">
-                                            <textarea class="fbe-input fbe-textarea font-mono text-xs" rows="8"
-                                                placeholder="HTML personalizzato..."
-                                                :value="block.data.code"
-                                                @input="updateData(block.id, 'code', $event.target.value)"></textarea>
-                                            <div class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2 fbe-preview text-xs"
-                                                 x-html="block.data.code || ''"></div>
-                                        </div>
-                                    </template>
-
-                                </div>
+                                {{-- Drop strip AFTER this block --}}
+                                <div class="fbe-drop-strip"
+                                     :class="{ 'fbe-drop-active': dragTarget === 'after-' + block.id }"
+                                     @dragover.prevent="setDragTarget('after-' + block.id)"
+                                     @dragleave="clearDragTarget()"
+                                     @drop.prevent="dropNewBlock(idx + 1)"></div>
                             </div>
                         </template>
                     </div>
                 </div>
 
-                {{-- ── Right sidebar: media + preview ───────────────── --}}
-                <div class="w-60 shrink-0 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden bg-white dark:bg-gray-900">
-
-                    @if($mediaItems->isNotEmpty())
-                    {{-- Media gallery --}}
-                    <div class="shrink-0 border-b border-gray-200 dark:border-gray-700 overflow-y-auto p-3" style="max-height:55%;">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">📷 Media — clicca per inserire</p>
-                        <div class="grid grid-cols-2 gap-1.5">
-                            @foreach($mediaItems as $medium)
-                                @php $url = e($medium->getUrl()); $name = e($medium->name ?: $medium->file_name); @endphp
-                                <button
-                                    type="button"
-                                    title="{{ $name }}"
-                                    @click="addBlock('image'); $nextTick(() => { if(blocks.length){ let b = blocks[blocks.length-1]; if(b.type==='image'){ updateData(b.id,'src','{{ $url }}'); updateData(b.id,'alt','{{ $name }}'); } } })"
-                                    class="group relative rounded overflow-hidden border border-gray-200 dark:border-gray-600 hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
-                                >
-                                    <img src="{{ $url }}" alt="{{ $name }}" class="w-full h-14 object-cover block">
-                                    <div class="absolute inset-0 bg-primary-600/0 group-hover:bg-primary-600/20 transition-colors flex items-center justify-center">
-                                        <span class="opacity-0 group-hover:opacity-100 text-white text-[10px] font-bold drop-shadow transition-opacity">+ inserisci</span>
-                                    </div>
-                                </button>
-                            @endforeach
-                        </div>
+                {{-- ── Right sidebar: media gallery only ────────────── --}}
+                @if($mediaItems->isNotEmpty())
+                <div class="w-52 shrink-0 border-l border-gray-200 dark:border-gray-700 overflow-y-auto bg-gray-50 dark:bg-gray-800/60 p-3">
+                    <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-3">📷 Media — trascina sul canvas</p>
+                    <div class="flex flex-col gap-3">
+                        @foreach($mediaItems as $medium)
+                            @php
+                                $url      = $medium->getUrl();
+                                $name     = $medium->name ?: $medium->file_name;
+                                $nameEsc  = e($name);
+                                $urlEsc   = e($url);
+                            @endphp
+                            <div
+                                class="fbe-draggable rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-primary-400 dark:hover:border-primary-500 transition-colors select-none"
+                                draggable="true"
+                                @dragstart="startDrag('{{ $urlEsc }}', '{{ $nameEsc }}', $event)"
+                                @dragend="endDrag()"
+                                title="Trascina per inserire: {{ $nameEsc }}"
+                            >
+                                <img src="{{ $urlEsc }}" alt="{{ $nameEsc }}"
+                                     class="w-full h-28 object-cover block pointer-events-none">
+                                <p class="text-[10px] text-gray-500 dark:text-gray-400 px-2 py-1.5 truncate leading-tight"
+                                   title="{{ $nameEsc }}">{{ $name }}</p>
+                            </div>
+                        @endforeach
                     </div>
-                    @endif
-
-                    {{-- Mini HTML preview --}}
-                    <div class="flex-1 overflow-y-auto p-3" x-show="blocks.length > 0">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Anteprima</p>
-                        <div class="text-xs bg-gray-50 dark:bg-gray-800/50 rounded border border-gray-200 dark:border-gray-700 p-2 fbe-preview"
-                             x-html="previewHtml()"></div>
-                    </div>
-
                 </div>
+                @endif
 
             </div>{{-- /body --}}
         </div>{{-- /overlay --}}

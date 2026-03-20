@@ -1,5 +1,201 @@
 /**
  * filament-block-editor — Alpine.js block editor component
+ * Registered as window.blockEditor (loaded globally via FilamentAsset).
+ */
+(function () {
+    'use strict';
+
+    var DEFAULTS = {
+        paragraph: { text: 'Scrivi qui il testo...' },
+        heading:   { text: 'Titolo', level: 2 },
+        image:     { src: '', alt: '', width: '100%', align: 'center' },
+        columns:   { left: 'Colonna sinistra', right: 'Colonna destra' },
+        button:    { text: 'Clicca qui', url: '#', variant: 'primary' },
+        divider:   { spacing: 'md' },
+        spacer:    { height: 32 },
+        html:      { code: '<p>HTML personalizzato</p>' },
+    };
+
+    var LABELS = {
+        paragraph: '¶  Paragrafo',
+        heading:   'H  Titolo',
+        image:     '🖼  Immagine',
+        columns:   '▌▐  2 Colonne',
+        button:    '⬜  Pulsante',
+        divider:   '—  Separatore',
+        spacer:    '↕  Spazio',
+        html:      '</>  HTML',
+    };
+
+    function esc(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function uid() { return Math.random().toString(36).slice(2, 9); }
+
+    function renderBlock(block) {
+        var d = block.data || {};
+        switch (block.type) {
+            case 'paragraph':
+                return '<p style="margin:0 0 1em;line-height:1.6;color:#374151;">' + esc(d.text) + '</p>';
+            case 'heading': {
+                var lvl = Math.max(1, Math.min(6, parseInt(d.level) || 2));
+                var tag = 'h' + lvl;
+                var sizes = { 1: '2rem', 2: '1.5rem', 3: '1.25rem', 4: '1.1rem', 5: '1rem', 6: '0.9rem' };
+                return '<' + tag + ' style="margin:0 0 0.5em;font-size:' + (sizes[lvl] || '1.5rem') + ';font-weight:700;color:#111827;">'
+                    + esc(d.text) + '</' + tag + '>';
+            }
+            case 'image': {
+                if (!d.src) return '<div style="padding:1em;border:2px dashed #d1d5db;text-align:center;color:#9ca3af;font-size:12px;">Immagine non impostata</div>';
+                var al = d.align || 'center';
+                var mx = al === 'center' ? 'margin:0 auto;' : al === 'right' ? 'margin-left:auto;' : '';
+                return '<div style="text-align:' + al + ';">'
+                    + '<img src="' + esc(d.src) + '" alt="' + esc(d.alt || '') + '" style="max-width:100%;width:' + esc(d.width || '100%') + ';display:block;border-radius:4px;' + mx + '">'
+                    + '</div>';
+            }
+            case 'columns':
+                return '<div style="display:flex;gap:1rem;">'
+                    + '<div style="flex:1;min-width:0;">' + (d.left || '') + '</div>'
+                    + '<div style="flex:1;min-width:0;">' + (d.right || '') + '</div>'
+                    + '</div>';
+            case 'button': {
+                var vs = { primary: 'background:#4f46e5;color:#fff;', secondary: 'background:#6b7280;color:#fff;', outline: 'background:transparent;color:#4f46e5;border:2px solid #4f46e5;', danger: 'background:#dc2626;color:#fff;' };
+                return '<div style="text-align:center;margin:1em 0;"><a href="' + esc(d.url || '#') + '" style="display:inline-block;padding:0.6em 1.5em;border-radius:6px;font-weight:600;text-decoration:none;' + (vs[d.variant || 'primary'] || vs.primary) + '">' + esc(d.text || 'Button') + '</a></div>';
+            }
+            case 'divider': {
+                var sp = { sm: '0.5rem', md: '1rem', lg: '2rem' }[d.spacing || 'md'] || '1rem';
+                return '<hr style="border:none;border-top:1px solid #e5e7eb;margin:' + sp + ' 0;">';
+            }
+            case 'spacer':
+                return '<div style="height:' + (parseInt(d.height) || 32) + 'px;"></div>';
+            case 'html':
+                return d.code || '';
+            default:
+                return '';
+        }
+    }
+
+    window.blockEditor = function (params) {
+        return {
+            open:       false,
+            blocks:     [],
+            state:      params.state,
+            placeholder: params.placeholder || '',
+
+            // ── Drag & drop state ───────────────────────────────────────────
+            dragItem:   null,   // { src, alt } currently being dragged from gallery
+            dragTarget: null,   // string ID of the current hover drop zone
+
+            init: function () {
+                this._parseState();
+                var self = this;
+                this.$watch('state', function (val) {
+                    if (val !== JSON.stringify(self.blocks)) self._parseState();
+                });
+            },
+
+            _parseState: function () {
+                if (!this.state) { this.blocks = []; return; }
+                try { this.blocks = JSON.parse(this.state); } catch (e) { this.blocks = []; }
+            },
+
+            openEditor:      function () { this._parseState(); this.open = true; },
+            saveAndClose:    function () { this.state = JSON.stringify(this.blocks); this.open = false; },
+            discardAndClose: function () { this._parseState(); this.open = false; },
+
+            addBlock: function (type) {
+                var defaults = DEFAULTS[type] || {};
+                var data = {};
+                for (var k in defaults) if (Object.prototype.hasOwnProperty.call(defaults, k)) data[k] = defaults[k];
+                this.blocks = this.blocks.concat([{ id: uid(), type: type, data: data }]);
+            },
+
+            removeBlock: function (id) { this.blocks = this.blocks.filter(function (b) { return b.id !== id; }); },
+
+            moveUp: function (id) {
+                var idx = this.blocks.findIndex(function (b) { return b.id === id; });
+                if (idx > 0) { var arr = this.blocks.slice(); var tmp = arr[idx-1]; arr[idx-1] = arr[idx]; arr[idx] = tmp; this.blocks = arr; }
+            },
+            moveDown: function (id) {
+                var idx = this.blocks.findIndex(function (b) { return b.id === id; });
+                if (idx >= 0 && idx < this.blocks.length - 1) { var arr = this.blocks.slice(); var tmp = arr[idx]; arr[idx] = arr[idx+1]; arr[idx+1] = tmp; this.blocks = arr; }
+            },
+            duplicate: function (id) {
+                var idx = this.blocks.findIndex(function (b) { return b.id === id; });
+                if (idx < 0) return;
+                var clone = JSON.parse(JSON.stringify(this.blocks[idx])); clone.id = uid();
+                var arr = this.blocks.slice(); arr.splice(idx + 1, 0, clone); this.blocks = arr;
+            },
+
+            updateData: function (id, key, value) {
+                this.blocks = this.blocks.map(function (b) {
+                    if (b.id !== id) return b;
+                    var data = Object.assign({}, b.data); data[key] = value;
+                    return Object.assign({}, b, { data: data });
+                });
+            },
+
+            blockLabel:   function (type)  { return LABELS[type] || type; },
+            blockHtml:    function (block) { return renderBlock(block); },
+            previewHtml:  function ()      { return this.blocks.map(renderBlock).join('\n'); },
+
+            // ── Drag & drop ─────────────────────────────────────────────────
+
+            /** Called from gallery item dragstart */
+            startDrag: function (src, alt, event) {
+                this.dragItem = { src: src, alt: alt };
+                event.dataTransfer.effectAllowed = 'copy';
+                event.dataTransfer.setData('text/plain', src);
+            },
+
+            /** Called on dragend (from gallery or after drag ends anywhere) */
+            endDrag: function () {
+                this.dragItem   = null;
+                this.dragTarget = null;
+            },
+
+            setDragTarget:   function (id) { if (this.dragItem) this.dragTarget = id; },
+            clearDragTarget: function ()   { this.dragTarget = null; },
+
+            /**
+             * Drop between blocks: insert a new image block at position idx.
+             */
+            dropNewBlock: function (idx) {
+                if (!this.dragItem) return;
+                var newBlock = { id: uid(), type: 'image', data: Object.assign({ width: '100%', align: 'center' }, this.dragItem) };
+                var arr = this.blocks.slice(); arr.splice(idx, 0, newBlock);
+                this.blocks = arr;
+                this.dragItem = null; this.dragTarget = null;
+            },
+
+            /**
+             * Drop on an image block: replace its src/alt.
+             */
+            dropOnImageBlock: function (blockId) {
+                if (!this.dragItem) return;
+                this.updateData(blockId, 'src', this.dragItem.src);
+                this.updateData(blockId, 'alt', this.dragItem.alt);
+                this.dragItem = null; this.dragTarget = null;
+            },
+
+            /**
+             * Drop on a column side ('left' or 'right'): prepend <img> to that column's HTML.
+             */
+            dropOnColumn: function (blockId, side) {
+                if (!this.dragItem) return;
+                var block = this.blocks.find(function (b) { return b.id === blockId; });
+                if (!block) return;
+                var imgTag = '<img src="' + esc(this.dragItem.src) + '" alt="' + esc(this.dragItem.alt) + '" style="max-width:100%;height:auto;display:block;border-radius:4px;margin-bottom:0.5em;">';
+                var current = block.data[side] || '';
+                // If column currently holds the placeholder text, replace it; otherwise prepend
+                var isPlaceholder = current === 'Colonna sinistra' || current === 'Colonna destra';
+                this.updateData(blockId, side, isPlaceholder ? imgTag : imgTag + current);
+                this.dragItem = null; this.dragTarget = null;
+            },
+        };
+    };
+}());
  *
  * Registered as window.blockEditor so Filament/Alpine can call it via
  * x-data="blockEditor({ state: $wire.entangle(...).live })"
