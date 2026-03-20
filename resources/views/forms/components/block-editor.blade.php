@@ -189,8 +189,9 @@
                 {{-- ══════════════════════════════════════════════════════════ --}}
                 {{-- LEFT PANEL — palette + gallery                            --}}
                 {{-- ══════════════════════════════════════════════════════════ --}}
-                <div class="w-[20%] shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto
-                            bg-gray-50 dark:bg-gray-800/60 flex flex-col">
+                <div class="shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto overflow-x-hidden
+                            bg-gray-50 dark:bg-gray-800/60 flex flex-col"
+                     style="width:20%; max-width:20%; min-width:0; box-sizing:border-box;">
 
                     {{-- ── Sezioni ─────────────────────────────────────────── --}}
                     <div class="p-3 border-b border-gray-200 dark:border-gray-700">
@@ -239,12 +240,14 @@
                                 <div class="fbe-draggable rounded border border-gray-200 dark:border-gray-600
                                             bg-white dark:bg-gray-700 overflow-hidden
                                             hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+                                     style="width:100%; box-sizing:border-box;"
                                      draggable="true"
                                      @dragstart="startDrag('{{ $mUrl }}', '{{ e($mName) }}', $event)"
                                      @dragend="endDrag()"
                                      title="Trascina: {{ e($mName) }}">
                                     <img src="{{ $mUrl }}" alt="{{ e($mName) }}"
-                                         class="w-full h-24 object-cover block pointer-events-none">
+                                         class="h-20 object-cover block pointer-events-none"
+                                         style="width:100%; max-width:100%; display:block;">
                                     <p class="text-[10px] text-gray-500 dark:text-gray-400 px-2 py-1 truncate"
                                        title="{{ e($mName) }}">{{ $mName }}</p>
                                 </div>
