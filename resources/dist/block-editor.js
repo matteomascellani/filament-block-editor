@@ -4,7 +4,7 @@
  * Data model stored as JSON:
  *   { root: {mt,mr,mb,ml,pt,pr,pb,pl}, containers: [container] }
  *   container: { id, cols (1-4), mt,mr,mb,ml,pt,pr,pb,pl, columns: [column] }
- *   column:    { id, blocks: [block] }
+ *   column:    { id, flex: 1-3, blocks: [block] }
  *   block:     { id, type, data }
  *     paragraph: data = { html: '' }
  *     image:     data = { src, alt, width, align }
@@ -41,7 +41,7 @@
 
     function newSpacing() { return Object.assign({}, SPACING_ZERO); }
 
-    function newColumn() { return { id: uid(), blocks: [] }; }
+    function newColumn() { return { id: uid(), flex: 1, blocks: [] }; }
 
     function newContainer() {
         return Object.assign({ id: uid(), cols: 1, columns: [newColumn()] }, newSpacing());
@@ -76,7 +76,8 @@
         var colClass = 'fbc-' + c.id;
         var colsHtml = (c.columns || []).map(function (col) {
             var blocksHtml = (col.blocks || []).map(renderContentBlock).filter(Boolean).join('\n');
-            return '<div class="' + colClass + '" style="flex:1;min-width:0;">' + blocksHtml + '</div>';
+            var flexVal = parseInt(col.flex) || 1;
+            return '<div class="' + colClass + '" style="flex:' + flexVal + ';min-width:0;">' + blocksHtml + '</div>';
         }).join('');
 
         var wrapStyle = spacingStyle(c) + 'display:flex;flex-wrap:wrap;gap:1rem;';
@@ -207,6 +208,18 @@
                 if (this.focusedContainerId === id && this.focusedColIdx >= cols) {
                     this.focusedColIdx = cols - 1;
                 }
+            },
+
+            setColumnFlex: function (containerId, colIdx, flex) {
+                flex = Math.max(1, Math.min(3, parseInt(flex) || 1));
+                var idx = this.containers.findIndex(function (c) { return c.id === containerId; });
+                if (idx < 0) return;
+                var c = JSON.parse(JSON.stringify(this.containers[idx]));
+                if (!c.columns[colIdx]) return;
+                c.columns[colIdx].flex = flex;
+                var arr = this.containers.slice();
+                arr[idx] = c;
+                this.containers = arr;
             },
 
             updateContainerSpacing: function (id, key, val) {

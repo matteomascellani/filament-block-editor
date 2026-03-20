@@ -70,10 +70,11 @@ class BlockEditor extends Field
     private static function renderContainer(array $c): string
     {
         $colClass  = 'fbc-' . ($c['id'] ?? uniqid());
-        $colStyle  = 'flex:1;min-width:0;';
         $wrapStyle = static::spacingStyle($c) . 'display:flex;flex-wrap:wrap;gap:1rem;';
 
-        $colsHtml = implode('', array_map(function ($col) use ($colClass, $colStyle) {
+        $colsHtml = implode('', array_map(function ($col) use ($colClass) {
+            $flexVal    = max(1, min(3, (int) ($col['flex'] ?? 1)));
+            $colStyle   = 'flex:' . $flexVal . ';min-width:0;';
             $blocksHtml = implode("\n", array_filter(
                 array_map([static::class, 'renderContentBlock'], $col['blocks'] ?? [])
             ));

@@ -381,17 +381,35 @@
                             <div class="p-3 flex gap-3 flex-wrap items-start"
                                  :style="'gap:12px;'">
                                 <template x-for="(col, colIdx) in container.columns" :key="col.id">
-                                    <div class="fbe-col-area flex-1 min-w-0 p-2 rounded border border-dashed border-gray-200 dark:border-gray-700"
+                                    <div class="fbe-col-area min-w-0 p-2 rounded border border-dashed border-gray-200 dark:border-gray-700"
+                                         :style="'flex:' + (col.flex || 1) + ';min-width:0;'"
                                          :class="{ 'fbe-focused': isFocused(container.id, colIdx) }"
                                          @click.self="setFocus(container.id, colIdx)">
 
-                                        {{-- Column label --}}
-                                        <div class="flex items-center justify-between mb-2 cursor-pointer"
-                                             @click="setFocus(container.id, colIdx)">
-                                            <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400"
-                                                  x-text="container.cols > 1 ? 'Colonna ' + (colIdx + 1) : 'Contenuto'"></span>
+                                        {{-- Column label + flex selector --}}
+                                        <div class="flex items-center justify-between mb-2 cursor-pointer gap-2"
+                                             @click.self="setFocus(container.id, colIdx)">
+                                            <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 shrink-0"
+                                                  x-text="container.cols > 1 ? 'Col ' + (colIdx + 1) : 'Contenuto'"></span>
+
+                                            {{-- Width selector: only when 2+ columns --}}
+                                            <div x-show="container.cols > 1"
+                                                 class="flex items-center gap-0.5 shrink-0"
+                                                 title="Larghezza relativa colonna">
+                                                <template x-for="fw in [1,2,3]" :key="fw">
+                                                    <button type="button"
+                                                        @click.stop="setColumnFlex(container.id, colIdx, fw)"
+                                                        :class="(col.flex || 1) === fw
+                                                            ? 'bg-primary-600 text-white'
+                                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                                                        class="text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors leading-none"
+                                                        x-text="fw + 'x'">
+                                                    </button>
+                                                </template>
+                                            </div>
+
                                             <span x-show="isFocused(container.id, colIdx)"
-                                                  class="text-[9px] px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 font-medium">
+                                                  class="text-[9px] px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 font-medium ml-auto shrink-0">
                                                 attiva
                                             </span>
                                         </div>
