@@ -19,7 +19,7 @@ class FilamentBlockEditorServiceProvider extends ServiceProvider
         // Register the block-editor Alpine component globally so it is available
         // at page-load time before Alpine processes any x-data attributes.
         FilamentAsset::register([
-            Js::make('filament-block-editor', __DIR__ . '/../resources/dist/block-editor.js'),
+            Js::make('filament-block-editor-v2', __DIR__ . '/../resources/dist/block-editor.js'),
         ]);
     }
 

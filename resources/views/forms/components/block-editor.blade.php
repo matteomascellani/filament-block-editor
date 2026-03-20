@@ -189,7 +189,7 @@
                 {{-- ══════════════════════════════════════════════════════════ --}}
                 {{-- LEFT PANEL — palette + gallery                            --}}
                 {{-- ══════════════════════════════════════════════════════════ --}}
-                <div class="w-60 shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto
+                <div class="w-[20%] shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto
                             bg-gray-50 dark:bg-gray-800/60 flex flex-col">
 
                     {{-- ── Sezioni ─────────────────────────────────────────── --}}
@@ -258,11 +258,11 @@
                 {{-- ══════════════════════════════════════════════════════════ --}}
                 {{-- RIGHT PANEL — canvas                                      --}}
                 {{-- ══════════════════════════════════════════════════════════ --}}
-                <div class="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-950 p-5">
+                <div class="flex-1 flex flex-col overflow-hidden">
 
-                    {{-- ── Root wrapper spacing ────────────────────────────── --}}
-                    <div class="mb-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3 shadow-sm">
-                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
+                    {{-- ── Root wrapper spacing (fixed, above canvas) ──────── --}}
+                    <div class="shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
                             <span class="font-semibold text-gray-600 dark:text-gray-300 shrink-0">Wrapper esterno</span>
                             <div class="flex items-center gap-1">
                                 <span class="text-[10px] uppercase tracking-wide">Margine</span>
@@ -296,6 +296,9 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- ── Scrollable canvas ────────────────────────────────── --}}
+                    <div class="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-950 p-5">
 
                     {{-- ── Empty canvas ─────────────────────────────────────── --}}
                     <div x-show="containers.length === 0"
@@ -547,8 +550,9 @@
                                    transition-colors bg-transparent">
                             ＋ Aggiungi sezione
                         </button>
-                    </div>
+                    </div>{{-- /bottom add section --}}
 
+                    </div>{{-- /scrollable canvas --}}
                 </div>{{-- /right panel --}}
             </div>{{-- /body --}}
         </div>{{-- /overlay --}}
