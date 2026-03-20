@@ -1,0 +1,30 @@
+{
+    "name": "matteomascellani/filament-block-editor",
+    "description": "A block editor Filament form field — replaces textarea with a fullscreen drag-and-drop HTML block builder.",
+    "keywords": ["filament", "laravel", "block-editor", "form-field", "page-builder"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Matteo Mascellani",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "filament/filament": "^3.0 || ^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Matteomascellani\\FilamentBlockEditor\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Matteomascellani\\FilamentBlockEditor\\FilamentBlockEditorServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
