@@ -399,10 +399,9 @@
                                                 <template x-for="fw in [1,2,3]" :key="fw">
                                                     <button type="button"
                                                         @click.stop="setColumnFlex(container.id, colIdx, fw)"
-                                                        :class="(col.flex || 1) === fw
-                                                            ? 'bg-primary-600 text-white'
-                                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'"
-                                                        class="text-[9px] font-bold px-1.5 py-0.5 rounded transition-colors leading-none"
+                                                        :style="(col.flex || 1) === fw
+                                                            ? 'background:#7c3aed;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:none;cursor:pointer;line-height:1.4;'
+                                                            : 'background:#f3f4f6;color:#6b7280;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:none;cursor:pointer;line-height:1.4;'"
                                                         x-text="fw + 'x'">
                                                     </button>
                                                 </template>
