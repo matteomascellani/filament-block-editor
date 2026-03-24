@@ -102,6 +102,15 @@ class BlockEditor extends Field
                 if (empty($data['src'])) {
                     return '';
                 }
+
+                // Support both stored formats:
+                // - relative path (/storage/...) → prepend APP_URL for portability
+                // - absolute URL (https://...) → use as-is (legacy or external)
+                $src = $data['src'];
+                if (str_starts_with($src, '/')) {
+                    $src = rtrim(config('app.url'), '/') . $src;
+                    $data['src'] = $src;
+                }
                 $align    = in_array($data['align'] ?? '', ['left', 'center', 'right']) ? $data['align'] : 'left';
                 $width    = $data['width'] ?? '100%';
                 $isFullW  = ($width === '100%');

@@ -234,7 +234,9 @@
                         <div class="flex flex-col gap-2">
                             @foreach($mediaItems as $medium)
                                 @php
-                                    $mUrl  = e($medium->getUrl());
+                                    // Store relative path so the URL is rebuilt from APP_URL at render time,
+                                    // making content portable across tunnel rotations and environments.
+                                    $mUrl  = e(parse_url($medium->getUrl(), PHP_URL_PATH));
                                     $mName = $medium->name ?: $medium->file_name;
                                 @endphp
                                 <div class="fbe-draggable rounded border border-gray-200 dark:border-gray-600
